@@ -1,2 +1,3 @@
 # pyfiresight
-Python implementation of FireSight
+
+Vision toolkit for the Firenodejs.
