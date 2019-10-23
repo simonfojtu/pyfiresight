@@ -47,7 +47,7 @@ class FirenodejsAPI:
             resp = requests.post(self._url + '/firestep', json=request)
             if resp.status_code != 200:
                 raise APIError('POST {}/firestep json={} -> {}'.format(self._url, request, resp.status_code))
-            time.sleep(0.1)
+            #time.sleep(0.1)
             return resp.json()
 
 
@@ -120,7 +120,7 @@ def chessboard(center, size):
 #    if scale != 1:
 #        img = cv2.resize(img, None, fx=scale, fy=scale)
 #    h, w = img.shape
-#    x0, y0 = center - np.asarray((int(h / 2), int(w / 2)))
+#    x0, y0 = center - np.asarray((int(w / 2), int(h / 2)))
 #    print('Drawing bitmap {}x{} at {}:{}'.format(w, h, x0, y0))
 #    if h_flip:
 #        img = img[:, ::-1]
@@ -134,19 +134,26 @@ def chessboard(center, size):
 #        set_z(api, 0)
 
 
-def draw_bitmap2(api, args):
+def draw_bitmap(api, args):
+    # TODO hflip
     img = cv2.imread(args.image, cv2.IMREAD_GRAYSCALE)
-    dots = bitmap_2_dots(img)  # threshold
-    dpmm = args.dpmm
-    offset = tuple(map(float, args.offset.split(':')))
+    height, width = img.shape[:2]
+    dots = bitmap_2_dots(img, threshold=args.threshold)
+    x0, y0 = tuple(map(float, args.offset.split(':')))
+    if args.center:
+        x0 = x0 - width / args.dpmm / 2
+        y0 = y0 - height / args.dpmm / 2
 
-    # scale and offset
-    dots = ((x / dpmm + offset[0], y / dpmm + offset[1]) for (x, y) in dots)
+    print('Drawing bitmap: {}x{}px, {}x{}mm, offset: {}:{}mm'.format(
+        width, height, width / args.dpmm, height /args.dpmm, x0, y0
+    ))
+    time.sleep(2)
+
+    # apply scale and offset
+    dots = list(((x / args.dpmm + x0, y / args.dpmm + y0) for (x, y) in dots))
 
     if args.random:
-        dots = list(dots)
         random.shuffle(dots)
-
 
     draw_dots(api, dots)  # z_up, z_down
 
@@ -160,7 +167,7 @@ def bitmap_2_dots(img, *, threshold=128):
             yield (c, r)
 
 
-def draw_dots(api, dots, *, z_up=0, z_down=-10):
+def draw_dots(api, dots, *, z_up=5, z_down=-10):
     for x, y in dots:
         api.position({'mov': {'x': x, 'y': y}})
         set_z(api, z_down)
@@ -204,10 +211,12 @@ parser.add_argument('--fakemove', action='store_true', help='Fake movement')
 
 parser_bitmap = subparsers.add_parser('bitmap', help='Bitmap drawing')
 parser_bitmap.add_argument('--image', help='Path to image', required=True)
+parser_bitmap.add_argument('--threshold', help='Threshold for binarizing an image', default=128)
 parser_bitmap.add_argument('--dpmm', type=float, help='Dots per mm', default=1)
 parser_bitmap.add_argument('--offset', help='Offset the image [mm]', default='0:0')
+parser_bitmap.add_argument('--center', help='Center image around 0:0', action='store_true')
 parser_bitmap.add_argument('--random', help='Draw the dots in a random order', action='store_true')
-parser_bitmap.set_defaults(func=draw_bitmap2)
+parser_bitmap.set_defaults(func=draw_bitmap)
 
 parser_chess = subparsers.add_parser('chess', help='Chessboard drawing')
 parser_chess.add_argument('--size', help='Width of the chessboard', default=80)
