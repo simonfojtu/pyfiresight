@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import pprint
+import random
 import requests
 import time
 import cv2
@@ -105,37 +106,48 @@ def chessboard(center, size):
         draw_rectangle(x * a, y * a, (x + 1) * a, (y + 1) * a, fill=True)
 
 
-def draw_bitmap(api, args):
-    img = cv2.imread(args.image, cv2.IMREAD_GRAYSCALE)
-    bitmap(api, img, (0, 0), scale=1.0)
-
-
-def bitmap(api, img, center, *, threshold=128, scale=1, h_flip=True):
-    '''
-    Draws binary image using dots where a pixel value is less than threshold
-    1px = 1mm^2
-    '''
-    assert len(img.shape) == 2
-    if scale != 1:
-        img = cv2.resize(img, None, fx=scale, fy=scale)
-    h, w = img.shape
-    x0, y0 = center - np.asarray((int(h / 2), int(w / 2)))
-    print('Drawing bitmap {}x{} at {}:{}'.format(w, h, x0, y0))
-    if h_flip:
-        img = img[:, ::-1]
-    for r in range(h):
-        set_z(api, 0)
-        for c in range(w):
-            if img[r, c] < threshold:
-                api.position({'mov': {'x': int(c + x0), 'y': int(r + y0)}})
-                set_z(api, -10)
-                set_z(api, -5)
-        set_z(api, 0)
+#def draw_bitmap(api, args):
+#    img = cv2.imread(args.image, cv2.IMREAD_GRAYSCALE)
+#    bitmap(api, img, (0, 0), scale=1.0)
+#
+#
+#def bitmap(api, img, center, *, threshold=128, scale=1, h_flip=True):
+#    '''
+#    Draws binary image using dots where a pixel value is less than threshold
+#    1px = 1mm^2
+#    '''
+#    assert len(img.shape) == 2
+#    if scale != 1:
+#        img = cv2.resize(img, None, fx=scale, fy=scale)
+#    h, w = img.shape
+#    x0, y0 = center - np.asarray((int(h / 2), int(w / 2)))
+#    print('Drawing bitmap {}x{} at {}:{}'.format(w, h, x0, y0))
+#    if h_flip:
+#        img = img[:, ::-1]
+#    for r in range(h):
+#        set_z(api, 0)
+#        for c in range(w):
+#            if img[r, c] < threshold:
+#                api.position({'mov': {'x': int(c + x0), 'y': int(r + y0)}})
+#                set_z(api, -10)
+#                set_z(api, -5)
+#        set_z(api, 0)
 
 
 def draw_bitmap2(api, args):
     img = cv2.imread(args.image, cv2.IMREAD_GRAYSCALE)
     dots = bitmap_2_dots(img)  # threshold
+    dpmm = args.dpmm
+    offset = tuple(map(float, args.offset.split(':')))
+
+    # scale and offset
+    dots = ((x / dpmm + offset[0], y / dpmm + offset[1]) for (x, y) in dots)
+
+    if args.random:
+        dots = list(dots)
+        random.shuffle(dots)
+
+
     draw_dots(api, dots)  # z_up, z_down
 
 
@@ -192,7 +204,10 @@ parser.add_argument('--fakemove', action='store_true', help='Fake movement')
 
 parser_bitmap = subparsers.add_parser('bitmap', help='Bitmap drawing')
 parser_bitmap.add_argument('--image', help='Path to image', required=True)
-parser_bitmap.set_defaults(func=draw_bitmap)
+parser_bitmap.add_argument('--dpmm', type=float, help='Dots per mm', default=1)
+parser_bitmap.add_argument('--offset', help='Offset the image [mm]', default='0:0')
+parser_bitmap.add_argument('--random', help='Draw the dots in a random order', action='store_true')
+parser_bitmap.set_defaults(func=draw_bitmap2)
 
 parser_chess = subparsers.add_parser('chess', help='Chessboard drawing')
 parser_chess.add_argument('--size', help='Width of the chessboard', default=80)
