@@ -33,8 +33,6 @@ class FirenodejsAPI:
             pp = pprint.PrettyPrinter(indent=4)
             pp.pprint(response)
 
-            self.position(request={'hom':''})
-
     
     def camera(self, src='video0'):
         '''Get image from firenodejs REST API.'''
@@ -93,6 +91,7 @@ def draw_rectangle(api, x0, y0, x1, y1, *, fill=False):
 
 
 def draw_chessboard(api, args):
+    api.position(request={'hom':''})
     chessboard(api, (0, 0), args.size)
 
 
@@ -112,6 +111,7 @@ def chessboard(center, size):
 
 
 def draw_bitmap(api, args):
+    api.position(request={'hom':''})
     img = cv2.imread(args.image, cv2.IMREAD_GRAYSCALE)
     if args.hflip:
         img = img[:, ::-1]
@@ -193,7 +193,7 @@ def draw_bitmap_lines(api, img, args):
     widgets=[
         ' [', progressbar.Timer(), '] ',
         progressbar.Bar(),
-        ' (', progressbar.ETA(), ') ',
+        ' (', progressbar.AdaptiveETA(), ') ',
     ]
     bar = progressbar.ProgressBar(max_value=len(lines), widgets=widgets).start()
     draw_lines(api, lines, z_up=args.z_up, z_down=args.z_down, cback=bar.update)
@@ -238,8 +238,8 @@ parser.add_argument('--url', default='http://10.0.0.10:8080', help='URL of firen
 parser.add_argument('--fakemove', action='store_true', help='Fake movement')
 parser.add_argument('--z-up', type=float, default=15, help='Retract tip height')
 parser.add_argument('--z-down', type=float, default=-10, help='Draw tip height')
-parser.add_argument('--tv', type=float, default=0.7, help='Set seconds to reach maximum velocity')
-parser.add_argument('--mv', type=float, default=12800, help='Set maximum velocity (pulses/second)')
+parser.add_argument('--tv', type=float, default=None, help='Set seconds to reach maximum velocity')
+parser.add_argument('--mv', type=float, default=None, help='Set maximum velocity (pulses/second)')
 
 parser_bitmap = subparsers.add_parser('bitmap', help='Bitmap drawing')
 parser_bitmap.add_argument('--image', help='Path to image', required=True)
