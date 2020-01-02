@@ -50,7 +50,7 @@ class FirenodejsAPI:
             resp = requests.post(self._url + '/firestep', json=request)
             if resp.status_code != 200:
                 raise APIError('POST {}/firestep json={} -> {}'.format(self._url, request, resp.status_code))
-            time.sleep(0.1)
+            #time.sleep(0.01)
             return resp.json()
 
 
@@ -68,7 +68,11 @@ def set_z(api, z):
 
 
 def move_to_xy(api, x, y):
-    api.position({'mov': {'x': int(x), 'y': int(y)}})
+    api.position({'mov': {'x': x, 'y': y, 'lpp': False}})
+
+
+def move_to_xyz(api, x, y, z):
+    api.position({'mov': {'x': x, 'y': y, 'z': z, 'lpp': False}})
 
 
 def draw_rectangle(api, x0, y0, x1, y1, *, fill=False):
@@ -129,13 +133,14 @@ def draw_bitmap_dots(api, img, args):
         x0 = x0 - width / args.dpmm / 2
         y0 = y0 - height / args.dpmm / 2
 
+    # apply scale and offset
+    dots = list(((x / args.dpmm + x0, y / args.dpmm + y0) for (x, y) in dots))
+
     print('Drawing bitmap: {}x{}px, {}x{}mm, offset: {}:{}mm'.format(
         width, height, width / args.dpmm, height /args.dpmm, x0, y0
     ))
+    print('# dots:', len(dots))
     time.sleep(2)
-
-    # apply scale and offset
-    dots = list(((x / args.dpmm + x0, y / args.dpmm + y0) for (x, y) in dots))
 
     if args.random:
         random.shuffle(dots)
@@ -160,10 +165,17 @@ def bitmap_2_dots(img, *, threshold=128):
 
 
 def draw_dots(api, dots, *, z_up, z_down, cback=None):
+    # make a separate move between dots if max(abs(px-x), abs(py-y)) is greater than threshold
+    px = 0
+    py = 0
+    adj_threshold = 4  # [mm]
     for i, (x, y) in enumerate(dots):
-        api.position({'mov': {'x': x, 'y': y}})
-        set_z(api, z_down)
-        set_z(api, z_up)
+        if max(abs(px - x), abs(py - y)) > adj_threshold:
+            move_to_xyz(api, x, y, z_up)
+        move_to_xyz(api, x, y, z_down)
+        move_to_xyz(api, x, y, z_up)
+        px = x
+        py = y
         if cback is not None:
             cback(i)
 
@@ -259,7 +271,8 @@ parser_chess.set_defaults(func=draw_chessboard)
 
 args = parser.parse_args()
 api = FirenodejsAPI(args)
-args.func(api, args)
+if hasattr(args, 'func'):
+    args.func(api, args)
 
 
 
